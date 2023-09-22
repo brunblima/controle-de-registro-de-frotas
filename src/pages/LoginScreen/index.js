@@ -19,7 +19,7 @@ export default function LoginScreen() {
   const code = 123;
 
   const login = () => {
-    if (email === user || password === code) {
+    if (email === user && password == code) {
       navigation.navigate('Home');
     } else {
       alert('dados incorretos');

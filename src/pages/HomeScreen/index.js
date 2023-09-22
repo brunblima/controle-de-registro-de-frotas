@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,12 @@ import {
 import {Picker} from '@react-native-picker/picker';
 import CheckBox from '@react-native-community/checkbox';
 import {TouchableOpacity} from 'react-native-gesture-handler';
+import {useNavigation} from '@react-navigation/native';
 
 export default function HomeScreen() {
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+
   const [selectedOption, setSelectedOption] = useState('opcao0'); // Estado para o selecionador
   const [checklistItems, setChecklistItems] = useState([
     {label: 'Chave de Roda', checked: false},
@@ -46,6 +50,11 @@ export default function HomeScreen() {
   const [isTracking, setIsTracking] = useState(false);
   const [observation, setObservation] = useState('');
   const [isObservationEnabled, setIsObservationEnabled] = useState(true);
+  const navigation = useNavigation();
+
+  const handleViewHistorico = () => {
+    navigation.navigate('History', {startDate, endDate, selectedOption}); 
+  };
 
   //Essa função irá selecionar ou desmarcar todos os checkbox
   const handleToggleAllCheckboxes = () => {
@@ -75,12 +84,25 @@ export default function HomeScreen() {
 
   const handleTrackingToggle = () => {
     if (isTracking) {
-      // Finalizar o rastreamento
-      // Aqui você pode adicionar a lógica para finalizar o rastreamento, se necessário.
       setIsObservationEnabled(false);
+      const end = new Date();
+      const endString = end.toISOString();
+      setEndDate(endString);
+
+      // Aqui você pode adicionar lógica para salvar os dados de histórico ou enviar para algum lugar
+      // Por exemplo, você pode criar um novo objeto de histórico com startDate e endDate e adicioná-lo a uma lista de histórico.
+
+      navigation.navigate('History', {
+        startDate,
+        endDate,
+        selectedOption,
+        // Outros dados de histórico, se necessário
+      });
     } else {
-      // Iniciar o rastreamento
       if (!verificarPlacaSelecionada() || !verificarCheckboxesMarcados()) {
+        const start = new Date();
+        const startString = start.toISOString();
+        setStartDate(startString);
         return;
       }
       // Aqui você pode adicionar a lógica para iniciar o rastreamento.
@@ -88,6 +110,7 @@ export default function HomeScreen() {
     }
     setIsTracking(!isTracking);
   };
+  console.log(startDate)
 
   //Essa função verifica se alguma placa valida foi selecionada
   const verificarPlacaSelecionada = () => {
@@ -128,11 +151,7 @@ export default function HomeScreen() {
           enabled={!isTracking} // Desabilitar o Picker quando estiver rastreando
           style={getDisabledStyle()} // Aplicar estilo condicional
         >
-          <Picker.Item
-            label="Nenhuma opção selecionada"
-            value="opcao0"
-            style={{color: '#1212'}}
-          />
+          <Picker.Item label="Nenhuma opção selecionada" value="opcao0" />
           <Picker.Item label="RNX7D00" value="RNX7D00" />
           <Picker.Item label="RNU2C66" value="RNU2C66" />
           <Picker.Item label="RTB0E67" value="RTB0E67" />
@@ -194,6 +213,12 @@ export default function HomeScreen() {
           {isTracking ? 'Finalizar' : 'Iniciar'}
         </Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.viewHistorico}
+        onPress={handleViewHistorico}>
+        <Text style={styles.textHistory}>Ver Histórico</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -231,7 +256,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1D4696',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   textStar: {
     color: '#FFF',
@@ -259,5 +284,15 @@ const styles = StyleSheet.create({
   },
   finish: {
     backgroundColor: 'red',
+  },
+  viewHistorico: {
+    height: 30,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textHistory: {
+    color: '#121212',
+    fontWeight: 'bold',
   },
 });
