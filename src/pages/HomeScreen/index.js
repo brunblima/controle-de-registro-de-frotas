@@ -11,11 +11,13 @@ import {Picker} from '@react-native-picker/picker';
 import CheckBox from '@react-native-community/checkbox';
 import {TouchableOpacity} from 'react-native-gesture-handler';
 import {useNavigation} from '@react-navigation/native';
+import { useAuth } from '../../context/AuthContext';
 
 export default function HomeScreen() {
+
+  const { user, signOut } = useAuth();
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
-
   const [selectedOption, setSelectedOption] = useState('opcao0'); // Estado para o selecionador
   const [checklistItems, setChecklistItems] = useState([
     {label: 'Chave de Roda', checked: false},
@@ -53,7 +55,16 @@ export default function HomeScreen() {
   const navigation = useNavigation();
 
   const handleViewHistorico = () => {
-    navigation.navigate('History', {startDate, endDate, selectedOption}); 
+    navigation.navigate('History', {startDate, endDate, selectedOption});
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigation.navigate('Login')
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
   };
 
   //Essa função irá selecionar ou desmarcar todos os checkbox
@@ -88,29 +99,18 @@ export default function HomeScreen() {
       const end = new Date();
       const endString = end.toISOString();
       setEndDate(endString);
-
-      // Aqui você pode adicionar lógica para salvar os dados de histórico ou enviar para algum lugar
-      // Por exemplo, você pode criar um novo objeto de histórico com startDate e endDate e adicioná-lo a uma lista de histórico.
-
-      navigation.navigate('History', {
-        startDate,
-        endDate,
-        selectedOption,
-        // Outros dados de histórico, se necessário
-      });
     } else {
       if (!verificarPlacaSelecionada() || !verificarCheckboxesMarcados()) {
-        const start = new Date();
-        const startString = start.toISOString();
-        setStartDate(startString);
         return;
       }
-      // Aqui você pode adicionar a lógica para iniciar o rastreamento.
+      const start = new Date();
+      const startString = start.toISOString();
+      setStartDate(startString);
+
       setIsObservationEnabled(false);
     }
     setIsTracking(!isTracking);
   };
-  console.log(startDate)
 
   //Essa função verifica se alguma placa valida foi selecionada
   const verificarPlacaSelecionada = () => {
@@ -144,6 +144,10 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <ScrollView>
+        <TouchableOpacity style={styles.logout} onPress={handleLogout}>
+          <Text style={styles.textLogout}>Sair</Text>
+        </TouchableOpacity>
+
         <Text style={styles.label}>Selecione a Placa de Veiculo:</Text>
         <Picker
           selectedValue={selectedOption}
@@ -227,6 +231,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+  },
+  logout: {
+    height: 30,
+    width: 60,
+    alignSelf:'flex-end',
+    backgroundColor: '#1D4696',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textLogout:{
+    color: '#fff',
+    fontWeight: 'bold'
   },
   label: {
     fontSize: 18,

@@ -1,29 +1,11 @@
-import {createStackNavigator} from '@react-navigation/stack';
+import AuthRoutes from "./auth.route";
+import AppRoutes from "./app.routes";
+import { useAuth } from "../context/AuthContext";
 
-import LoginScreen from '../pages/LoginScreen';
-import HomeScreen from '../pages/HomeScreen';
-import HistoricoScreen from '../pages/HistorySreen';
-
-const Stack = createStackNavigator();
-
-export default function Routes() {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen
-        name="Login"
-        component={LoginScreen}
-        options={{headerShown: false}}
-      />
-      <Stack.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{headerShown: false}}
-      />
-      <Stack.Screen
-        name="History"
-        component={HistoricoScreen}
-        options={{headerShown: false}}
-      />
-    </Stack.Navigator>
-  );
+function Routes (){
+  const {signed} = useAuth()
+  console.log(signed)
+  return !signed ? <AuthRoutes/> : <AppRoutes/>
 }
+
+export default Routes;

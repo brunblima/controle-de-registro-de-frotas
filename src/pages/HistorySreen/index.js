@@ -1,36 +1,42 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {View, Text, FlatList, StyleSheet, TouchableOpacity, Button} from 'react-native';
 
 export default function HistoryScreen({route}) {
 
-  const [historico, setHistorico] = useState([]);
-  const { startDate, endDate, selectedOption } = route.params;
+   const { startDate, endDate, selectedOption } = route.params;
+   const [historico, setHistorico] = useState([]);
+   
+  useEffect(() => {
+    if (startDate || endDate) {
+      const newEntry = {
+        id: new Date().getTime().toString(), 
+        selectedOption,
+        startDate,
+        endDate,
+      };
+     
+      setHistorico((prevHistorico) => [...prevHistorico, newEntry]);
+    }
+  }, [startDate, endDate, selectedOption]);
 
-  const dateStart = new Date(startDate);
-  const dateEnd = new Date(endDate);
 
   return (
     <View style={styles.container}>
       <Text style={styles.tittle}>Histórico de Uso do Veículo</Text>
       <FlatList
+        data={historico}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() =>
-              navigation.navigate('History', {
-                selectedOption: item.selectedOption,
-                startDate: item.startDate,
-                endDate: item.endDate,
-              })
-            }
-            style={styles.item}
-          >
+          <View style={styles.item}>
             <Text>Placa do Veículo: {item.selectedOption}</Text>
             <Text>Data de Início: {new Date(item.startDate).toLocaleString()}</Text>
-            <Text>Data de Fim: {new Date(item.endDate).toLocaleString()}</Text>
-          </TouchableOpacity>
+            <Text>
+              Data de Fim: {item.endDate ? new Date(item.endDate).toLocaleString() : 'Em Andamento'}
+            </Text>
+          </View>
         )}
       />
+      
     </View>
   );
 }

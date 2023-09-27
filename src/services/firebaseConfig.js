@@ -1,18 +1,18 @@
-// import firebase from '@react-native-firebase/app';
+import firebase from '@react-native-firebase/app';
+import '@react-native-firebase/auth';
 
-// // Cole suas configurações do Firebase aqui
-// const firebaseConfig = {
-//   apiKey: "AIzaSyA7FhFq-sw2StNZAVw4Kz1AvDqMtZg98Os",
-//   authDomain: "frotaane-66184.firebaseapp.com",
-//   databaseURL: "https://frotaane-66184-default-rtdb.firebaseio.com",
-//   projectId: "frotaane-66184",
-//   storageBucket: "frotaane-66184.appspot.com",
-//   messagingSenderId: "140675565536",
-//   appId: "1:140675565536:web:e86c1ad1a947656dc98d85",
-//   measurementId: "G-R1ES3Z1H1W"
-// };
+const firebaseConfig = {
+  apiKey: 'AIzaSyAL1fmkxrEAXUBu4o_F75Nl8sZsGGZLdo8',
+  authDomain: 'frota-1e566.firebaseapp.com',
+  databaseURL: 'https://frota-1e566-default-rtdb.firebaseio.com',
+  projectId: 'frota-1e566',
+  storageBucket: 'frota-1e566.appspot.com',
+  messagingSenderId: '791859704307',
+  appId: '1:791859704307:web:6bc4e37c4fdd6646fe2286',
+};
 
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
-//   const app =  firebase.initializeApp(firebaseConfig);
-
-// export default app;
+export default firebase;
