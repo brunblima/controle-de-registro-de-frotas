@@ -11,14 +11,15 @@ import {Picker} from '@react-native-picker/picker';
 import CheckBox from '@react-native-community/checkbox';
 import {TouchableOpacity} from 'react-native-gesture-handler';
 import {useNavigation} from '@react-navigation/native';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/AuthContext';
+import firestore from '@react-native-firebase/firestore';
+import firebase from '../../services/firebaseConfig';
 
 export default function HomeScreen() {
-
-  const { user, signOut } = useAuth();
+  const {user, signOut} = useAuth();
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
-  const [selectedOption, setSelectedOption] = useState('opcao0'); // Estado para o selecionador
+  const [selectedOption, setSelectedOption] = useState('opcao0');
   const [checklistItems, setChecklistItems] = useState([
     {label: 'Chave de Roda', checked: false},
     {label: 'Pneus/Step', checked: false},
@@ -61,7 +62,7 @@ export default function HomeScreen() {
   const handleLogout = async () => {
     try {
       await signOut();
-      navigation.navigate('Login')
+      navigation.navigate('Login');
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     }
@@ -92,13 +93,59 @@ export default function HomeScreen() {
       setChecklistItems(updatedItems);
     }
   };
+  //Essa é a função do botão 'Iniciar/Finalizar
 
-  const handleTrackingToggle = () => {
+  const handleTrackingToggle = async () => {
+    const user = firebase.auth().currentUser; // Obtenha o usuário autenticado
+
     if (isTracking) {
       setIsObservationEnabled(false);
       const end = new Date();
       const endString = end.toISOString();
       setEndDate(endString);
+
+      // Consulta a coleção para obter o último sequenceId
+      const querySnapshot = await firestore()
+        .collection('trackingData')
+        .where('userId', '==', user.uid)
+        .orderBy('sequenceId', 'desc')
+        .limit(1)
+        .get();
+
+      let lastSequenceId = 0;
+
+      if (!querySnapshot.empty) {
+        lastSequenceId = querySnapshot.docs[0].data().sequenceId;
+      }
+
+      const newSequenceId = lastSequenceId + 1;
+
+      try {
+        // Define o novo documento com o sequenceId incrementado
+        await firestore().collection('trackingData').add({
+          userId: user.uid,
+          email: user.email,
+          startDate,
+          endDate: endString,
+          selectedOption,
+          observation,
+          sequenceId: newSequenceId, // Define o novo sequenceId
+        });
+      } catch (error) {
+        console.error('Erro ao salvar os dados no Firestore:', error);
+      }
+
+      // Redefine o estado de checklistItems para false
+      const resetChecklistItems = checklistItems.map(item => ({
+        ...item,
+        checked: false,
+      }));
+
+      // Redefine selectedOption para 'opcao0'
+      setSelectedOption('opcao0');
+      setChecklistItems(resetChecklistItems);
+      setObservation('');
+      setIsObservationEnabled(true);
     } else {
       if (!verificarPlacaSelecionada() || !verificarCheckboxesMarcados()) {
         return;
@@ -106,12 +153,10 @@ export default function HomeScreen() {
       const start = new Date();
       const startString = start.toISOString();
       setStartDate(startString);
-
       setIsObservationEnabled(false);
     }
     setIsTracking(!isTracking);
   };
-
   //Essa função verifica se alguma placa valida foi selecionada
   const verificarPlacaSelecionada = () => {
     if (selectedOption === 'opcao0') {
@@ -144,9 +189,12 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <ScrollView>
+        <View style={styles.header}>
+        <Text style={styles.title}>Registro de Frota</Text>
         <TouchableOpacity style={styles.logout} onPress={handleLogout}>
           <Text style={styles.textLogout}>Sair</Text>
         </TouchableOpacity>
+        </View>
 
         <Text style={styles.label}>Selecione a Placa de Veiculo:</Text>
         <Picker
@@ -232,23 +280,31 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  header: {
+    flexDirection:'row',
+    marginBottom: 15,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',  
+  },
   logout: {
     height: 30,
     width: 60,
-    alignSelf:'flex-end',
+    alignSelf: 'flex-end',
+    marginLeft: 140,
     backgroundColor: '#1D4696',
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  textLogout:{
+  textLogout: {
     color: '#fff',
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
   label: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
-    marginBottom: 8,
   },
   checklist: {
     marginTop: 8,
@@ -256,7 +312,8 @@ const styles = StyleSheet.create({
   checklistItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 5,
+    
   },
   input: {
     height: 120,
@@ -290,11 +347,9 @@ const styles = StyleSheet.create({
   },
   toggleButton: {
     flexDirection: 'row',
-    paddingVertical: 8,
+    paddingVertical: 2,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 15,
   },
   toggleButtonText: {
     color: '#1D4696',

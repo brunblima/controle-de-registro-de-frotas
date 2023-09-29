@@ -8,30 +8,15 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
 import * as Animatable from 'react-native-animatable';
 import {useAuth} from '../../context/AuthContext';
-import firebase from '../../services/firebaseConfig';
+
 
 export default function LoginScreen() {
   const {signInWithEmailAndPassword} = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const navigation = useNavigation();
 
-  // const checkIfUserExists = async email => {
-  //   try {
-  //     const methods = await firebase.auth().fetchSignInMethodsForEmail(email);
-  //     // Se o e-mail não estiver associado a nenhum método de login, ele não existe
-  //     if (methods.length === 0) {
-  //       return false;
-  //     }
-  //     return true; // O e-mail existe
-  //   } catch (error) {
-  //     console.error('Erro ao verificar se o e-mail existe:', error);
-  //     return false; // Tratamento de erro
-  //   }
-  // };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -40,16 +25,6 @@ export default function LoginScreen() {
     }
     await signInWithEmailAndPassword(email, password);
   };
-    // const userExists = await checkIfUserExists(email);
-
-    // if (!userExists) {
-    //   Alert.alert(
-    //     'Erro de Login',
-    //     'Usuário não cadastrado. Por favor, verifique suas credenciais ou crie uma conta.',
-    //   );
-    //   return; // Impede a tentativa de login se o usuário não existir
-    // }
-     
   
 
   return (

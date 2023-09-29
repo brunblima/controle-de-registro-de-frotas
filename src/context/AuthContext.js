@@ -1,11 +1,10 @@
 import React, {createContext, useContext, useEffect, useState} from 'react';
-import {Alert} from 'react-native'
+import {Alert} from 'react-native';
 import firebase from '../services/firebaseConfig';
 const AuthContext = createContext();
 
 const AuthProvider = ({children}) => {
   const [user, setUser] = useState(null);
-
 
   useEffect(() => {
     // Adicione um listener para observar o estado de autenticação do usuário
@@ -30,7 +29,6 @@ const AuthProvider = ({children}) => {
         Alert.alert(
           'Erro de Login',
           'E-mail ou senha incorretos. Por favor, verifique suas credenciais.',
-          
         );
       } else if (error.code === 'auth/invalid-email') {
         Alert.alert(
@@ -43,7 +41,6 @@ const AuthProvider = ({children}) => {
           'Ocorreu um erro ao fazer login. Por favor, tente novamente mais tarde.',
         );
       }
-      
     }
   };
 
