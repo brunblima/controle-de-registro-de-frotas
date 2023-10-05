@@ -1,6 +1,7 @@
 import React, {createContext, useContext, useEffect, useState} from 'react';
 import {Alert} from 'react-native';
 import firebase from '../services/firebaseConfig';
+
 const AuthContext = createContext();
 
 const AuthProvider = ({children}) => {

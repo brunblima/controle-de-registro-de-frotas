@@ -6,17 +6,19 @@ import {
   ScrollView,
   Alert,
   TextInput,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {Picker} from '@react-native-picker/picker';
 import CheckBox from '@react-native-community/checkbox';
-import {TouchableOpacity} from 'react-native-gesture-handler';
 import {useNavigation} from '@react-navigation/native';
 import {useAuth} from '../../context/AuthContext';
 import firestore from '@react-native-firebase/firestore';
 import firebase from '../../services/firebaseConfig';
 
 export default function HomeScreen() {
-  const {user, signOut} = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const {user, signOut, setUser} = useAuth();
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [selectedOption, setSelectedOption] = useState('opcao0');
@@ -54,18 +56,34 @@ export default function HomeScreen() {
   const [observation, setObservation] = useState('');
   const [isObservationEnabled, setIsObservationEnabled] = useState(true);
   const navigation = useNavigation();
+  const [isToggleAllChecked, setIsToggleAllChecked] = useState(false);
 
   const handleViewHistorico = () => {
     navigation.navigate('History', {startDate, endDate, selectedOption});
   };
 
   const handleLogout = async () => {
-    try {
-      await signOut();
-      navigation.navigate('Login');
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-    }
+    Alert.alert(
+      'Confirmação',
+      'Tem certeza de que deseja sair?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel', // Estilo do botão para cancelar
+        },
+        {
+          text: 'Sair',
+          onPress: async () => {
+            try {
+              await signOut(true);
+            } catch (error) {
+              console.error('Erro ao fazer logout:', error);
+            }
+          },
+        },
+      ],
+      {cancelable: false},
+    );
   };
 
   //Essa função irá selecionar ou desmarcar todos os checkbox
@@ -73,9 +91,10 @@ export default function HomeScreen() {
     if (!isTracking) {
       const updatedItems = checklistItems.map(item => ({
         ...item,
-        checked: !checklistItems.every(item => item.checked),
+        checked: !isToggleAllChecked, // Usar o estado do botão
       }));
       setChecklistItems(updatedItems);
+      setIsToggleAllChecked(!isToggleAllChecked); // Alternar o estado do botão
     }
   };
 
@@ -93,9 +112,10 @@ export default function HomeScreen() {
       setChecklistItems(updatedItems);
     }
   };
-  //Essa é a função do botão 'Iniciar/Finalizar
 
+  //Essa é a função do botão 'Iniciar/Finalizar
   const handleTrackingToggle = async () => {
+    setIsLoading(true);
     const user = firebase.auth().currentUser; // Obtenha o usuário autenticado
 
     if (isTracking) {
@@ -108,17 +128,8 @@ export default function HomeScreen() {
       const querySnapshot = await firestore()
         .collection('trackingData')
         .where('userId', '==', user.uid)
-        .orderBy('sequenceId', 'desc')
         .limit(1)
         .get();
-
-      let lastSequenceId = 0;
-
-      if (!querySnapshot.empty) {
-        lastSequenceId = querySnapshot.docs[0].data().sequenceId;
-      }
-
-      const newSequenceId = lastSequenceId + 1;
 
       try {
         // Define o novo documento com o sequenceId incrementado
@@ -129,10 +140,23 @@ export default function HomeScreen() {
           endDate: endString,
           selectedOption,
           observation,
-          sequenceId: newSequenceId, // Define o novo sequenceId
         });
+        Alert.alert(
+          'Percurso Finalizado',
+          'Após finalizar o percurso, você será deslogado, para que o proximo usuario entre.',
+          [
+            {
+              text: 'OK',
+              onPress: async () => {
+                setIsLoading(false); // Desativar o indicador de loading
+                signOut(true); // Deslogar o usuário após o aviso
+              },
+            },
+          ],
+        );
       } catch (error) {
         console.error('Erro ao salvar os dados no Firestore:', error);
+        setIsLoading(false);
       }
 
       // Redefine o estado de checklistItems para false
@@ -155,6 +179,7 @@ export default function HomeScreen() {
       setStartDate(startString);
       setIsObservationEnabled(false);
     }
+    setIsLoading(false);
     setIsTracking(!isTracking);
   };
   //Essa função verifica se alguma placa valida foi selecionada
@@ -190,10 +215,10 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <ScrollView>
         <View style={styles.header}>
-        <Text style={styles.title}>Registro de Frota</Text>
-        <TouchableOpacity style={styles.logout} onPress={handleLogout}>
-          <Text style={styles.textLogout}>Sair</Text>
-        </TouchableOpacity>
+          <Text style={styles.title}>Registro de Frota</Text>
+          <TouchableOpacity style={styles.logout} onPress={handleLogout}>
+            <Text style={styles.textLogout}>Sair</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.label}>Selecione a Placa de Veiculo:</Text>
@@ -201,8 +226,7 @@ export default function HomeScreen() {
           selectedValue={selectedOption}
           onValueChange={handlePickerChange}
           enabled={!isTracking} // Desabilitar o Picker quando estiver rastreando
-          style={getDisabledStyle()} // Aplicar estilo condicional
-        >
+          style={[{color: '#242424'}, getDisabledStyle()]}>
           <Picker.Item label="Nenhuma opção selecionada" value="opcao0" />
           <Picker.Item label="RNX7D00" value="RNX7D00" />
           <Picker.Item label="RNU2C66" value="RNU2C66" />
@@ -243,8 +267,9 @@ export default function HomeScreen() {
               disabled={isTracking}
               value={item.checked}
               onValueChange={() => handleChecklistChange(index)}
+              tintColors={{true: '#242424', false: '#242424'}}
             />
-            <Text>{item.label}</Text>
+            <Text style={styles.checkbox}>{item.label}</Text>
           </View>
         ))}
         <Text style={styles.label}>Observação:</Text>
@@ -261,9 +286,13 @@ export default function HomeScreen() {
       <TouchableOpacity
         style={[styles.start, isTracking ? styles.finish : null]}
         onPress={handleTrackingToggle}>
-        <Text style={styles.textStar}>
-          {isTracking ? 'Finalizar' : 'Iniciar'}
-        </Text>
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#FFF" />
+        ) : (
+          <Text style={styles.textStar}>
+            {isTracking ? 'Finalizar' : 'Iniciar'}
+          </Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -279,14 +308,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+    backgroundColor: '#fff',
   },
   header: {
-    flexDirection:'row',
+    flexDirection: 'row',
     marginBottom: 15,
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',  
+    fontWeight: 'bold',
+    color: '#242424',
   },
   logout: {
     height: 30,
@@ -305,6 +336,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 17,
     fontWeight: 'bold',
+    color: '#242424',
   },
   checklist: {
     marginTop: 8,
@@ -313,7 +345,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 5,
-    
   },
   input: {
     height: 120,
@@ -322,6 +353,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
     marginBottom: 16,
+    marginTop: 10,
   },
   start: {
     height: 50,
@@ -366,5 +398,14 @@ const styles = StyleSheet.create({
   textHistory: {
     color: '#121212',
     fontWeight: 'bold',
+  },
+  loadingIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{translateX: -25}, {translateY: -25}],
+  },
+  checkbox: {
+    color: '#242424',
   },
 });
