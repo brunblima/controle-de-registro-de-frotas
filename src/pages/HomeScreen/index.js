@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -15,10 +15,11 @@ import {useNavigation} from '@react-navigation/native';
 import {useAuth} from '../../context/AuthContext';
 import firestore from '@react-native-firebase/firestore';
 import firebase from '../../services/firebaseConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(false);
-  const {user, signOut, setUser} = useAuth();
+  const {signOut} = useAuth();
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [selectedOption, setSelectedOption] = useState('opcao0');
@@ -52,7 +53,7 @@ export default function HomeScreen() {
       checked: false,
     },
   ]);
-  const [isTracking, setIsTracking] = useState(false);
+  const [isTracking, setIsTracking] = useState();
   const [observation, setObservation] = useState('');
   const [isObservationEnabled, setIsObservationEnabled] = useState(true);
   const navigation = useNavigation();
@@ -61,6 +62,10 @@ export default function HomeScreen() {
   const handleViewHistorico = () => {
     navigation.navigate('History', {startDate, endDate, selectedOption});
   };
+  
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleLogout = async () => {
     Alert.alert(
@@ -69,12 +74,13 @@ export default function HomeScreen() {
       [
         {
           text: 'Cancelar',
-          style: 'cancel', // Estilo do botão para cancelar
+          style: 'cancel',
         },
         {
           text: 'Sair',
           onPress: async () => {
             try {
+              await AsyncStorage.removeItem('userData');
               await signOut(true);
             } catch (error) {
               console.error('Erro ao fazer logout:', error);
@@ -86,53 +92,82 @@ export default function HomeScreen() {
     );
   };
 
-  //Essa função irá selecionar ou desmarcar todos os checkbox
   const handleToggleAllCheckboxes = () => {
     if (!isTracking) {
       const updatedItems = checklistItems.map(item => ({
         ...item,
-        checked: !isToggleAllChecked, // Usar o estado do botão
+        checked: !isToggleAllChecked,
       }));
       setChecklistItems(updatedItems);
-      setIsToggleAllChecked(!isToggleAllChecked); // Alternar o estado do botão
+      setIsToggleAllChecked(!isToggleAllChecked);
     }
   };
 
-  //Essa função irá alterar o valor do Picker
-  const handlePickerChange = value => {
+  const handlePickerChange = async value => {
     if (!isTracking) {
       setSelectedOption(value);
+      const dataToSave = {
+        startDate,
+        endDate,
+        selectedOption: value,
+        checklistItems,
+        isTracking,
+        observation,
+        isObservationEnabled,
+      };
+      await saveData(dataToSave); // Use 'await' para garantir que o salvamento seja concluído antes de continuar
     }
   };
+  
 
-  const handleChecklistChange = index => {
+  const handleChecklistChange = async (index) => {
     if (!isTracking) {
       const updatedItems = [...checklistItems];
       updatedItems[index].checked = !updatedItems[index].checked;
       setChecklistItems(updatedItems);
+  
+      const dataToSave = {
+        startDate,
+        endDate,
+        selectedOption,
+        checklistItems: updatedItems,
+        isTracking,
+        observation,
+        isObservationEnabled,
+      };
+      
+      // Salvar os dados atualizados no AsyncStorage
+      await saveData(dataToSave);
     }
   };
 
-  //Essa é a função do botão 'Iniciar/Finalizar
+  const handleCancelTracking = async () => {
+    try {
+      await AsyncStorage.removeItem('userData');
+      setIsTracking(!isTracking);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Erro ao limpar os dados:', error);
+    }
+    setIsLoading(false);
+  };
+
+  //Função antiga do botão
   const handleTrackingToggle = async () => {
     setIsLoading(true);
-    const user = firebase.auth().currentUser; // Obtenha o usuário autenticado
+
+    const user = firebase.auth().currentUser;
+
+    const start = new Date();
+    const startString = start.toISOString();
+    setStartDate(startString);
 
     if (isTracking) {
-      setIsObservationEnabled(false);
       const end = new Date();
       const endString = end.toISOString();
       setEndDate(endString);
 
-      // Consulta a coleção para obter o último sequenceId
-      const querySnapshot = await firestore()
-        .collection('trackingData')
-        .where('userId', '==', user.uid)
-        .limit(1)
-        .get();
-
       try {
-        // Define o novo documento com o sequenceId incrementado
         await firestore().collection('trackingData').add({
           userId: user.uid,
           email: user.email,
@@ -143,13 +178,21 @@ export default function HomeScreen() {
         });
         Alert.alert(
           'Percurso Finalizado',
-          'Após finalizar o percurso, você será deslogado, para que o proximo usuario entre.',
+          'Após finalizar o percurso, você será deslogado, para que o próximo usuário entre.',
           [
+            {
+              text: 'Cancelar',
+              onPress: () => handleCancelTracking(),
+
+              style: 'cancel',
+            },
             {
               text: 'OK',
               onPress: async () => {
-                setIsLoading(false); // Desativar o indicador de loading
-                signOut(true); // Deslogar o usuário após o aviso
+                await AsyncStorage.removeItem('userData');
+                setIsTracking(!isTracking);
+                setIsLoading(false);
+                signOut(true);
               },
             },
           ],
@@ -159,30 +202,27 @@ export default function HomeScreen() {
         setIsLoading(false);
       }
 
-      // Redefine o estado de checklistItems para false
       const resetChecklistItems = checklistItems.map(item => ({
         ...item,
         checked: false,
       }));
 
-      // Redefine selectedOption para 'opcao0'
       setSelectedOption('opcao0');
       setChecklistItems(resetChecklistItems);
       setObservation('');
       setIsObservationEnabled(true);
     } else {
       if (!verificarPlacaSelecionada() || !verificarCheckboxesMarcados()) {
+        setIsLoading(false);
         return;
       }
-      const start = new Date();
-      const startString = start.toISOString();
-      setStartDate(startString);
       setIsObservationEnabled(false);
+      setIsTracking(true);
     }
+    saveData();
     setIsLoading(false);
-    setIsTracking(!isTracking);
   };
-  //Essa função verifica se alguma placa valida foi selecionada
+
   const verificarPlacaSelecionada = () => {
     if (selectedOption === 'opcao0') {
       Alert.alert(
@@ -194,13 +234,12 @@ export default function HomeScreen() {
     return true;
   };
 
-  //Essa função verifica se todos os checkbox foram selecionados
   const verificarCheckboxesMarcados = () => {
     const isAllChecked = checklistItems.every(item => item.checked);
     if (!isAllChecked) {
       Alert.alert(
         'Aviso',
-        'É necessario está com os conformes de acordo com a lista de verificação.',
+        'É necessário estar conforme de acordo com a lista de verificação.',
       );
       return false;
     }
@@ -209,6 +248,129 @@ export default function HomeScreen() {
 
   const getDisabledStyle = () => {
     return isTracking ? styles.disabled : null;
+  };
+
+  const saveData = async (data) => {
+    try {
+      if (data) {
+        console.log(data);
+        await AsyncStorage.setItem('userData', JSON.stringify(data));
+      } else {
+        // Trate o caso em que 'data' é null ou undefined, se necessário.
+      }
+    } catch (error) {
+      console.error('Erro ao salvar os dados:', error);
+    }
+};
+
+
+  const loadData = async () => {
+    try {
+      const data = await AsyncStorage.getItem('userData');
+
+      if (data) {
+        const parsedData = JSON.parse(data);
+        setStartDate(parsedData.startDate);
+        setEndDate(parsedData.endDate);
+        setSelectedOption(parsedData.selectedOption);
+        setChecklistItems(parsedData.checklistItems);
+        setObservation(parsedData.observation);
+        setIsObservationEnabled(parsedData.isObservationEnabled);
+        setIsTracking(parsedData.isTracking);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar os dados:', error);
+    }
+  };
+
+  const handleStartTracking = async () => {
+    if (!verificarPlacaSelecionada() || !verificarCheckboxesMarcados()) {
+      setIsLoading(false);
+      return;
+    }
+    const start = new Date();
+    const startString = start.toISOString();
+    setStartDate(startString);
+
+    setIsLoading(false);
+
+    const updatedIsObeservationEnabled = false;
+    setIsObservationEnabled(updatedIsObeservationEnabled)
+    const updatedIsTracking = true;
+    setIsTracking(updatedIsTracking);
+
+    const dataToSave = {
+      startDate: startString,
+      endDate,
+      selectedOption,
+      checklistItems,
+      isTracking: updatedIsTracking, 
+      observation,
+      isObservationEnabled: updatedIsObeservationEnabled,
+    };
+    
+    // Salva os dados atualizados no AsyncStorage
+    await saveData(dataToSave);
+
+  };
+  const handleStopTracking = async () => {
+    setIsLoading(true);
+
+    const end = new Date();
+    const endString = end.toISOString();
+    setEndDate(endString);
+    
+    const user = firebase.auth().currentUser;
+    try {
+      await firestore().collection('trackingData').add({
+        userId: user.uid,
+        email: user.email,
+        startDate,
+        endDate: endString,
+        selectedOption,
+        observation,
+        checklistItems,
+      });
+     
+      // Remova os dados do AsyncStorage
+      await AsyncStorage.removeItem('userData');
+      
+      // Mostrar o seu Alert personalizado após o envio bem-sucedido
+      Alert.alert(
+        'Percurso Finalizado',
+        'Após finalizar o percurso, você será deslogado, para que o próximo usuário entre.',
+        [
+          {
+            text: 'Cancelar',
+            onPress: () => handleCancelTracking(),
+            style: 'cancel',
+          },
+          {
+            text: 'OK',
+            onPress: async () => {
+              setIsTracking(!isTracking);
+              setIsLoading(false);
+              signOut(true);
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Erro ao salvar os dados no Firestore:', error);
+      setIsLoading(false);
+    }
+    const resetChecklistItems = checklistItems.map(item => ({
+      ...item,
+      checked: false,
+    }));
+    // Redefina os estados para os valores iniciais
+    setStartDate(null);
+    setEndDate(null);
+    setSelectedOption('opcao0');
+    setChecklistItems(resetChecklistItems);
+    setObservation('');
+    setIsObservationEnabled(true);
+    setIsLoading(false);
   };
 
   return (
@@ -225,7 +387,7 @@ export default function HomeScreen() {
         <Picker
           selectedValue={selectedOption}
           onValueChange={handlePickerChange}
-          enabled={!isTracking} // Desabilitar o Picker quando estiver rastreando
+          enabled={!isTracking}
           style={[{color: '#242424'}, getDisabledStyle()]}>
           <Picker.Item label="Nenhuma opção selecionada" value="opcao0" />
           <Picker.Item label="RNX7D00" value="RNX7D00" />
@@ -275,7 +437,11 @@ export default function HomeScreen() {
         <Text style={styles.label}>Observação:</Text>
         <TextInput
           style={[styles.input, isObservationEnabled ? null : styles.disabled]}
-          onChangeText={text => setObservation(text)}
+          placeholderTextColor="#808080"
+          onChangeText={text => {
+            setObservation(text); // Atualize a observação
+            saveData(); // Salve a observação após a atualização
+          }}
           value={observation}
           placeholder="Adicione uma observação (opcional)"
           editable={isObservationEnabled}
@@ -285,7 +451,7 @@ export default function HomeScreen() {
       </ScrollView>
       <TouchableOpacity
         style={[styles.start, isTracking ? styles.finish : null]}
-        onPress={handleTrackingToggle}>
+        onPress={isTracking ? handleStopTracking : handleStartTracking}>
         {isLoading ? (
           <ActivityIndicator size="large" color="#FFF" />
         ) : (
@@ -322,8 +488,7 @@ const styles = StyleSheet.create({
   logout: {
     height: 30,
     width: 60,
-    alignSelf: 'flex-end',
-    marginLeft: 140,
+    marginLeft: 'auto',
     backgroundColor: '#1D4696',
     borderRadius: 20,
     justifyContent: 'center',
@@ -354,6 +519,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 16,
     marginTop: 10,
+    color: '#121212',
   },
   start: {
     height: 50,
@@ -407,5 +573,8 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     color: '#242424',
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });
